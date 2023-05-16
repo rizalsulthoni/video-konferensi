@@ -16,6 +16,7 @@
         #videos-pengajar {
             width: 100%;
             height: auto;
+            position: relative;
         }
 
         #videos-peserta {
@@ -29,6 +30,27 @@
             width: 200px;
             height: 150px;
             border: 1px solid #ccc;
+            position: relative;
+        }
+
+        .video-local::before {
+            content: 'local : ' attr(id);
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 3px 10px;
+            background-color: #81ffa7;
+            font-size: 12px;
+        }
+
+        .video-box::before {
+            content: attr(id);
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 3px 10px;
+            background-color: #ff8181;
+            font-size: 12px;
         }
 
         #videos-pengajar>video,
@@ -41,56 +63,19 @@
 </head>
 
 <body>
-    <h1>Video Konferensi <span id="timer"></span></h1>
+    <h1>Video Konferensi <sup id="timer"></sup> <button type="button" id="open" onclick="openRoom()">Open</button></h1>
     <div id="videos-container">
         <div id="videos-pengajar"></div>
         <div id="videos-peserta"></div>
-    </div>
-
-    <div>
-        <button type="button" id="open" onclick="openRoom()">Open</button>
     </div>
 
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/rtcmulticonnection@3.7.1/dist/RTCMultiConnection.min.js"></script>
 
     <script>
-        function startTimer() {
-            var startTime = new Date().getTime(); // Waktu mulai timer
-
-            setInterval(function () {
-                var currentTime = new Date().getTime(); // Waktu saat ini
-                var timeDiff = currentTime - startTime; // Selisih waktu dalam milidetik
-
-                // Menghitung jam, menit, dan detik dari selisih waktu
-                var hours = Math.floor((timeDiff / (1000 * 60 * 60)) % 24);
-                var minutes = Math.floor((timeDiff / (1000 * 60)) % 60);
-                var seconds = Math.floor((timeDiff / 1000) % 60);
-
-                // Format waktu dengan menambahkan nol di depan jika angka < 10
-                hours = ("0" + hours).slice(-2);
-                minutes = ("0" + minutes).slice(-2);
-                seconds = ("0" + seconds).slice(-2);
-
-                var duration = hours + ":" + minutes + ":" + seconds;
-
-                // Memperbarui tampilan dengan durasi waktu
-                document.getElementById("timer").textContent = duration;
-            }, 1000);
-        }
-        function getParameterByName(name, url) {
-            if (!url) url = window.location.href;
-            name = name.replace(/[[\]]/g, "\\$&");
-            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
-                results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, " "));
-        }
-    </script>
-    <script>
         var socket = io();
-        var set_room = 'ini-adalah-kode-room-id';
+        var set_room = 'kode-room-id';
+        var set_owner_userid = '';
 
         // Membuat instance RTCMultiConnection
         var connection = new RTCMultiConnection();
@@ -110,8 +95,11 @@
                 var videosPengajar = document.getElementById('videos-pengajar');
                 var videoBox = document.createElement('div');
 
+                videoBox.className = 'video-local';
+                videoBox.setAttribute('id', event.userid)
                 videoBox.appendChild(video);
                 videosPengajar.appendChild(videoBox);
+                set_owner_userid = event.userid;
             } else {
                 var videosPeserta = document.getElementById('videos-peserta');
                 var videoBox = document.createElement('div');
@@ -123,23 +111,12 @@
             }
 
             startTimer()
-
         };
 
         // Event saat koneksi terhubung
         connection.onopen = function (event) {
             console.log('Terhubung ke room: ' + event.roomid);
             console.log('ID pengguna: ' + event.userid);
-        };
-
-        // Event saat ada data yang diterima
-        connection.onmessage = function (event) {
-            if (event.data.broadcastStreamId) {
-                connection.send({
-                    broadcastStreamId: true,
-                    fileStream: event.data.fileStream,
-                });
-            }
         };
 
         // Event saat pengguna terputus atau keluar dari room
@@ -165,10 +142,20 @@
             console.log('Error koneksi: ' + error);
         };
 
+        // function socket connected
+        let my_socket_id = '';
         socket.on('connect', () => {
-            console.log('connected')
+            my_socket_id = socket.id;
+            console.log('connected', socket.id)
+            socket.emit('owner_room', set_room)
         })
 
+        socket.on('permintaan_masuk', (data_userid, socket_id) => {
+            console.log('permintaan_masuk', data_userid, socket_id)
+            socket.emit('terima_permintaan_masuk', set_owner_userid, data_userid, socket_id)
+        })
+
+        // buka room webinar
         function openRoom() {
             connection.checkPresence(set_room, (isRoomExists, roomid) => {
                 if (isRoomExists) {
@@ -179,6 +166,34 @@
             })
         }
 
+    </script>
+
+    <script>
+        function startTimer() {
+            var totalSeconds = 0;
+            setInterval(() => {
+                ++totalSeconds;
+                var hour = Math.floor(totalSeconds / 3600);
+                var minute = Math.floor((totalSeconds - hour * 3600) / 60);
+                var seconds = totalSeconds - (hour * 3600 + minute * 60);
+                var runTimer = hour + ":" + minute + ":" + seconds;
+                document.getElementById("timer").innerHTML = runTimer;
+
+                // broadcast ke semua user dalam room ini 
+                socket.emit('run_timer', set_owner_userid, runTimer)
+                console.log('run_timer', runTimer)
+            }, 1000);
+        }
+
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
     </script>
 </body>
 

@@ -8,34 +8,56 @@ const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
 
+let uuids = {};
+let owners = {};
+
 io.on("connection", (socket) => {
     RTCMultiConnectionServer.addSocket(socket);
     console.log("client terhubung: ", socket.id);
 
-    socket.emit("open", "anda terhubung dengan soketi.io");
-
-    socket.on("pesan", (data) => {
-        console.log("pesan diterima: ", data);
-        socket.emit("emailBalasan", "pesan diterima!");
+    // simpan roomid dan socket.id dari owner pengajar
+    socket.on("owner_room", (owner_id) => {
+        socket.owner_id = owner_id;
+        owners[owner_id] = socket.id;
     });
 
     socket.on("disconnect", () => {
         console.log("client terputus: ", socket.id);
     });
 
-    // Menangani event createOrJoin
-    socket.on("createOrJoin", ({ roomId }) => {
-        const room = io.sockets.adapter.rooms.get(roomId);
+    // jika ada peserta yang masuk room
+    socket.on("mau_masuk", (owner_id, my_userid, my_socket_id) => {
+        console.log("mau_masuk", owner_id, my_userid, my_socket_id);
+        // kirim permintaan masuk ke owner dari peserta
+        io.to(owners[owner_id]).emit(
+            "permintaan_masuk",
+            my_userid,
+            my_socket_id
+        );
+    });
 
-        if (!room || room.size === 0) {
-            // Jika room belum ada atau kosong, maka socket yang mengirim event akan menjadi host
-            socket.join(roomId);
-            io.to(socket.id).emit("createdOrJoined", { userId: socket.id });
-        } else {
-            // Jika room sudah ada, maka socket yang mengirim event akan bergabung sebagai peserta
-            socket.join(roomId);
-            io.to(socket.id).emit("createdOrJoined", { userId: socket.id });
+    // terima permintaan masuk dari owner room
+    socket.on(
+        "terima_permintaan_masuk",
+        (owner_userid, data_userid, socket_id) => {
+            console.log(
+                "terima_permintaan_masuk",
+                owner_userid,
+                data_userid,
+                socket_id
+            );
+            // konfirmasi data ke peserta yang request permintaan masuk
+            io.to(socket_id).emit(
+                "konfirmasi_data_masuk",
+                owner_userid,
+                data_userid
+            );
         }
+    );
+
+    socket.on("run_timer", (owner_id, timer) => {
+        console.log("run_timer", owner_id, timer);
+        socket.broadcast.to(owners[owner_id]).emit("timer_video", timer);
     });
 });
 

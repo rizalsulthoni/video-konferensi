@@ -4,33 +4,42 @@
 <head>
     <title>Video Konferensi dengan RTCMultiConnection</title>
     <style>
-        #videos-conrtainer {
-            width: 500px;
-            height: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        #videos-pengajar {
-            width: 100%;
-            height: auto;
-        }
-
-        #videos-peserta {
+        #videos-container {
             display: flex;
             width: 100%;
             flex-wrap: wrap;
             gap: 15px;
         }
 
-        .video-box {
+        .video-box,
+        .video-owner {
             width: 200px;
             height: 150px;
             border: 1px solid #ccc;
+            position: relative;
         }
 
-        #videos-pengajar>video,
+        .video-owner::before {
+            content: 'owner : ' attr(id);
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 3px 10px;
+            background-color: #81ff8e;
+            font-size: 12px;
+        }
+
+        .video-box::before {
+            content: attr(id);
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 3px 10px;
+            background-color: #ff8181;
+            font-size: 12px;
+        }
+
+        .video-owner>video,
         .video-box>video {
             width: 100%;
             height: 100%;
@@ -40,15 +49,9 @@
 </head>
 
 <body>
-    <h1>Video Konferensi dengan RTCMultiConnection</h1>
-    <div id="videos-container">
-        <div id="videos-pengajar"></div>
-        <div id="videos-peserta"></div>
-    </div>
-
-    <div>
-        <button type="button" id="join" onclick="joinRoom()">Join</button>
-    </div>
+    <h1>Video Konferensi <sup id="timer"></sup> : <button type="button" id="join" onclick="joinRoom()">Join</button>
+    </h1>
+    <div id="videos-container"></div>
 
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/rtcmulticonnection@3.7.1/dist/RTCMultiConnection.min.js"></script>
@@ -64,7 +67,31 @@
         }
 
         var socket = io();
-        var set_room = 'ini-adalah-kode-room-id';
+        var set_room = 'kode-room-id';
+        let my_socket_id = '';
+
+        // fungsi socket.io jika user sudah terkoneksi
+        socket.on('connect', function () {
+            my_socket_id = socket.id;
+            console.log('connected', socket.id)
+        });
+
+        socket.on('konfirmasi_data_masuk', (owner_userid) => {
+            console.log('konfirmasi_data_masuk', owner_userid)
+
+            setTimeout(() => {
+                var ownerVideo = document.getElementById(owner_userid);
+                ownerVideo.classList.remove('video-box')
+                ownerVideo.classList.add('video-owner')
+
+                console.log('update class video owner')
+            }, 3000)
+        })
+
+        socket.on('timer_video', (timer) => {
+            console.log('timer', timer)
+            document.getElementById('timer').innerHTML = timer
+        })
 
         // Membuat instance RTCMultiConnection
         var connection = new RTCMultiConnection();
@@ -77,15 +104,18 @@
             var videosContainer = document.getElementById('videos-container');
             var video = event.mediaElement;
             video.controls = false;
+            video.muted = true; // Mematikan suara video semuanya
 
-            var videoBox = document.createElement('div');
+            console.log(event)
+
             if (event.type === 'local') {
-                video.muted = true; // Mematikan suara video lokal
-                videoBox.className = 'video-local';
-            } else {
-                videoBox.className = 'video-box';
+                socket.emit('mau_masuk', set_room, event.userid, my_socket_id)
+                console.log('mau_masuk', set_room, event.userid, my_socket_id)
             }
 
+            var videoBox = document.createElement('div');
+            videoBox.className = 'video-box';
+            videoBox.setAttribute('id', event.userid);
             videoBox.appendChild(video);
             videosContainer.appendChild(videoBox);
         };
@@ -109,19 +139,6 @@
         connection.onerror = function (error) {
             console.log('Error koneksi: ' + error);
         };
-
-
-        // Menghubungkan ke room
-        socket.on('connect', function () {
-            console.log('socket on connect')
-            /* var roomId = 'ini-adalah-kode-room-id'; // Ganti dengan ID room yang diinginkan
-
-            // Mengirim ID socket ke server untuk membuat atau bergabung dengan room
-            socket.emit('createOrJoin', { roomId: roomId });
-
-            // Bergabung dengan room menggunakan RTCMultiConnection
-            connection.join(roomId); */
-        });
 
         function joinRoom() {
             connection.checkPresence(set_room, (isRoomExists, roomid) => {
