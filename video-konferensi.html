@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Video Konferensi dengan RTCMultiConnection</title>
+    <style>
+        #videos-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-gap: 20px;
+            padding: 20px;
+        }
+
+        .video-box {
+            position: relative;
+            width: 300px;
+            height: 200px;
+            margin: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .video-owner-label {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background-color: #FF0000;
+            color: #FFF;
+            padding: 5px;
+            font-size: 12px;
+        }
+
+        .controls-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .controls-container button {
+            margin: 0 5px;
+        }
+
+        .admin-controls-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .admin-controls-container button {
+            margin: 0 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Video Konferensi dengan RTCMultiConnection</h1>
+    <div id="videos-container"></div>
+
+
+    <div class="controls-container">
+        <button onclick="joinRoom('room_01')">Join</button>
+        <button onclick="openRoom('room_01')">Open</button>
+    </div>
+    <div class="controls-container">
+        <button onclick="toggleVideoMute()">Mute/Unmute Video</button>
+    </div>
+
+    <div class="admin-controls-container">
+        <button onclick="toggleParticipantVideo()">Mute/Unmute Video Peserta</button>
+    </div>
+
+    <script src="https://cdn.webrtc-experiment.com/RTCMultiConnection.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Membuat instance RTCMultiConnection
+        var connection = new RTCMultiConnection();
+
+        // Konfigurasi RTCMultiConnection
+        connection.socketURL = '/';
+        connection.session = {
+            audio: true,
+            video: true
+        };
+
+        // Menyimpan informasi pemilik (owner) room
+        var ownerInfo = {
+            userId: null,
+            streamId: null
+        };
+
+        // Menampilkan video lokal dan remote saat terhubung
+        connection.onstream = function (event) {
+            var videosContainer = document.getElementById('videos-container');
+            var video = event.mediaElement;
+            var isOwner = event.userid === ownerInfo.userId && event.streamid === ownerInfo.streamId;
+
+            var videoBox = document.createElement('div');
+            videoBox.className = 'video-box';
+            videoBox.appendChild(video);
+
+            // Menambahkan label pada video pemilik (owner)
+            if (isOwner) {
+                var ownerLabel = document.createElement('div');
+                ownerLabel.className = 'video-owner-label';
+                ownerLabel.textContent = 'Owner';
+                videoBox.appendChild(ownerLabel);
+            }
+
+            videosContainer.appendChild(videoBox);
+        };
+
+        // Event saat koneksi terhubung
+        connection.onopen = function (event) {
+            console.log('Terhubung ke room: ' + event.roomid);
+            console.log('ID pengguna: ' + event.userid);
+
+            // Menyimpan informasi pemilik (owner) room
+            ownerInfo.userId = event.userid;
+            ownerInfo.streamId = connection.attachStreams[0].streamid;
+        };
+
+        // Event saat terjadi error
+        connection.onerror = function (error) {
+            console.log('Error koneksi: ' + error);
+        };
+
+        // Menghubungkan ke room
+        function openRoom(roomId) {
+            connection.open(roomId); // Menggunakan metode openOrJoin() untuk bergabung ke room jika sudah ada atau membuat baru jika belum ada
+        }
+        function joinRoom(roomId) {
+            connection.join(roomId); // Menggunakan metode openOrJoin() untuk bergabung ke room jika sudah ada atau membuat baru jika belum ada
+        }
+
+        // Toggle mute/unmute video lokal
+        function toggleVideoMute() {
+            var localStream = connection.attachStreams[0];
+            var videoTrack = localStream.getVideoTracks()[0];
+
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                var button = document.querySelector('.controls-container button');
+                button.textContent = videoTrack.enabled ? 'Mute Video' : 'Unmute Video';
+            }
+        }
+
+        // Toggle mute/unmute video peserta
+        function toggleParticipantVideo() {
+            var participantVideoEnabled = !connection.videosContainer.muted;
+
+            connection.videosContainer.muted = participantVideoEnabled;
+            var button = document.querySelector('.admin-controls-container button');
+            button.textContent = participantVideoEnabled ? 'Mute Video Peserta' : 'Unmute Video Peserta';
+        }
+
+        // Mengirim perintah mute/unmute video peserta ke server melalui Socket.io
+        function emitParticipantVideoControl(enabled) {
+            var socket = io();
+            socket.emit('participantVideoControl', enabled);
+        }
+
+        // Menerima perintah mute/unmute video peserta dari server melalui Socket.io
+        function handleParticipantVideoControl(enabled) {
+            connection.videosContainer.muted = enabled;
+            var button = document.querySelector('.admin-controls-container button');
+            button.textContent = enabled ? 'Mute Video Peserta' : 'Unmute Video Peserta';
+        }
+
+        // Menghubungkan dengan Socket.io server
+        var socket = io();
+
+        // Event saat menerima perintah mute/unmute video peserta dari server
+        socket.on('participantVideoControl', function (enabled) {
+            handleParticipantVideoControl(enabled);
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Video Konferensi dengan RTCMultiConnection</title>
+    <style>
+        #videos-conrtainer {
+            width: 500px;
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #videos-pengajar {
+            width: 100%;
+            height: auto;
+        }
+
+        #videos-peserta {
+            display: flex;
+            width: 100%;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .video-box {
+            width: 200px;
+            height: 150px;
+            border: 1px solid #ccc;
+        }
+
+        #videos-pengajar>video,
+        .video-box>video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Video Konferensi dengan RTCMultiConnection</h1>
+    <div id="videos-container">
+        <div id="videos-pengajar"></div>
+        <div id="videos-peserta"></div>
+    </div>
+
+    <div>
+        <button type="button" id="join" onclick="joinRoom()">Join</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/rtcmulticonnection@3.7.1/dist/RTCMultiConnection.min.js"></script>
+    <script>
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+
+        var socket = io();
+        var set_room = 'ini-adalah-kode-room-id';
+
+        // Membuat instance RTCMultiConnection
+        var connection = new RTCMultiConnection();
+
+        // Konfigurasi RTCMultiConnection
+        connection.socketURL = '/';
+
+        // Menampilkan video lokal dan remote saat terhubung
+        connection.onstream = function (event) {
+            var videosContainer = document.getElementById('videos-container');
+            var video = event.mediaElement;
+            video.controls = false;
+
+            var videoBox = document.createElement('div');
+            if (event.type === 'local') {
+                video.muted = true; // Mematikan suara video lokal
+                videoBox.className = 'video-local';
+            } else {
+                videoBox.className = 'video-box';
+            }
+
+            videoBox.appendChild(video);
+            videosContainer.appendChild(videoBox);
+        };
+
+        // Event saat koneksi terhubung
+        connection.onopen = function (event) {
+            console.log('Terhubung ke room: ' + event.roomid);
+            console.log('ID pengguna: ' + event.userid);
+        };
+
+        // Event saat pengguna terputus atau keluar dari room
+        connection.onclose = function (event) {
+            console.log('Pengguna terputus atau keluar dari room: ' + event.userid);
+            var videoElement = document.getElementById(event.userid);
+            if (videoElement) {
+                videoElement.parentNode.parentNode.removeChild(videoElement);
+            }
+        };
+
+        // Event saat terjadi error
+        connection.onerror = function (error) {
+            console.log('Error koneksi: ' + error);
+        };
+
+
+        // Menghubungkan ke room
+        socket.on('connect', function () {
+            console.log('socket on connect')
+            /* var roomId = 'ini-adalah-kode-room-id'; // Ganti dengan ID room yang diinginkan
+
+            // Mengirim ID socket ke server untuk membuat atau bergabung dengan room
+            socket.emit('createOrJoin', { roomId: roomId });
+
+            // Bergabung dengan room menggunakan RTCMultiConnection
+            connection.join(roomId); */
+        });
+
+        function joinRoom() {
+            connection.checkPresence(set_room, (isRoomExists, roomid) => {
+                if (isRoomExists) {
+                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                        .then(function (stream) {
+                            // Akses perangkat berhasil, lanjutkan dengan menggunakan stream
+                            connection.join(set_room)
+                        })
+                        .catch(function (error) {
+                            // Penolakan izin akses perangkat, tangani kesalahan di sini
+                            console.log('Izin akses perangkat ditolak:', error);
+                        });
+                } else {
+                    console.log('Room tidak tersedia')
+                }
+            })
+        }
+
+    </script>
+</body>
+
+</html>
