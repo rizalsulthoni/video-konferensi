@@ -31,7 +31,8 @@
             gap: 15px;
         }
 
-        .video-box {
+        .video-box,
+        .video-bicara {
             width: 200px;
             height: 150px;
             border: 1px solid #ccc;
@@ -48,6 +49,16 @@
             font-size: 12px;
         }
 
+        .video-bicara::before {
+            content: 'tanya : ' attr(id);
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 3px 10px;
+            background-color: #8e81ff;
+            font-size: 12px;
+        }
+
         .video-box::before {
             content: attr(id);
             position: absolute;
@@ -59,6 +70,7 @@
         }
 
         #videos-pengajar>video,
+        .video-bicara>video,
         .video-box>video {
             width: 100%;
             height: 100%;
@@ -68,7 +80,7 @@
 </head>
 
 <body>
-    <h1>Video Konferensi <sup id="timer"></sup></h1>
+    <h1>Video Konferensi <sup id="myid"></sup></h1>
     <div>
         <button type="button" id="open" onclick="openRoom()">Open</button>
         <button type="button" id="bagikanPesan" onclick="bagikanPesan()">Bagikan Pesan</button>
@@ -77,12 +89,13 @@
     <div id="videos-container">
         <div id="videos-pengajar">
             <div style="display: flex; gap: 15px; flex-direction: column;">
-                <ul id="list-peserta">
-                    <li><small><strong>List Peserta</strong></small></li>
-                </ul>
-                <ul id="list-bertanya">
-                    <li><small><strong>Peserta Bertanya</strong></small></li>
-                </ul>
+                <p id="jumlahPeserta"></p>
+
+                <p id="jumlahPeserta"><small><strong>List Peserta</strong></small></p>
+                <ul id="list-peserta"></ul>
+
+                <p id="jumlahPeserta"><small><strong>Peserta Bertanya</strong></small></p>
+                <ul id="list-bertanya"></ul>
             </div>
         </div>
         <div id="videos-peserta"></div>
@@ -131,6 +144,8 @@
                 videoBox.appendChild(video);
                 videosPengajar.appendChild(videoBox);
                 set_owner_userid = event.userid;
+
+                $('#myid').text(set_owner_userid)
             } else {
                 var videosPeserta = document.getElementById('videos-peserta');
                 var videoBox = document.createElement('div');
@@ -142,20 +157,15 @@
             }
 
             // startTimer()
-
+            const mainListUser = $('#list-peserta')
+            let listUser = '';
             connection.getAllParticipants().forEach(function (participantId) {
                 var user = connection.peers[participantId];
-                var hisUID = user.userid;
+                listUser += `<li>${user.userid}</li>`;
 
-                var mainListUser = document.getElementById('list-peserta')
-                var listUser = document.createElement('li');
-                var isUser = document.createTextNode(hisUID)
-                listUser.appendChild(isUser)
-                mainListUser.appendChild(listUser)
-
-                // alert(hisUID + ' connected with you.');
-                console.log(hisUID + ' connected with you.')
+                console.log(user.userid + ' connected with you.')
             });
+            mainListUser.html(listUser)
         };
 
         // Event saat koneksi terhubung
@@ -206,12 +216,16 @@
             const listInginBertanya = $('#list-bertanya')
             const listUserTanya = `
                 <li data-tanya-id="${my_user_id}">
-                    <b>${my_user_id}</b> ingin bertanya : <button type="button" data-konfirmasi-bicara="${my_user_id}">Terima</button> <button type="button" data-tolak-bicara="${my_user_id}">Tolak</button>
+                    <b>${my_user_id}</b> ingin bertanya : <button type="button" onclick="pesertaBicara('${my_user_id}')" id="pesertaBicara_${my_user_id}">Terima</button> <button type="button" onclick="pesertaSelesaiBicara('${my_user_id}')" id="pesertaSelesaiBicara_${my_user_id}">Tolak</button>
                 </li>
             `;
             if (listInginBertanya.find(`[data-tanya-id="${my_user_id}"]`).length === 0) {
                 listInginBertanya.append(listUserTanya)
             }
+        })
+        socket.on('peserta_selesai_bicara', (userid) => {
+            $(`#${userid}`).addClass('video-box').removeClass('video-bicara')
+            console.log('peserta_selesai_bicara', userid)
         })
 
         // buka room webinar
@@ -228,6 +242,19 @@
 
         function bagikanPesan() {
             socket.emit('bagikanPesan', set_room, set_owner_userid, 'pesan siaran untuk semua anggota room')
+        }
+
+        function pesertaBicara(userid) {
+            socket.emit('acc_peserta_bicara', set_room, userid)
+            console.log('acc_peserta_bicara', set_room, userid)
+            $(`#${userid}`).removeClass('video-box').addClass('video-bicara')
+            $(`#pesertaBicara_${userid}`).remove()
+            $(`#pesertaSelesaiBicara_${userid}`).text('Akhiri Bicara')
+        }
+        function pesertaSelesaiBicara(userid) {
+            socket.emit('end_peserta_bicara', set_room, userid)
+            console.log('end_peserta_bicara', set_room, userid)
+            $(`#${userid}`).addClass('video-box').removeClass('video-bicara')
         }
 
     </script>

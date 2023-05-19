@@ -13,6 +13,7 @@
         }
 
         .video-box,
+        .video-bicara,
         .video-owner {
             width: 200px;
             height: 150px;
@@ -30,6 +31,16 @@
             font-size: 12px;
         }
 
+        .video-bicara::before {
+            content: 'tanya : ' attr(id);
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 3px 10px;
+            background-color: #8e81ff;
+            font-size: 12px;
+        }
+
         .video-box::before {
             content: attr(id);
             position: absolute;
@@ -41,6 +52,7 @@
         }
 
         .video-owner>video,
+        .video-bicara>video,
         .video-box>video {
             width: 100%;
             height: 100%;
@@ -50,10 +62,11 @@
 </head>
 
 <body>
-    <h1>Video Konferensi <sup id="timer"></sup></h1>
+    <h1>Video Konferensi <sup id="myid"></sup></h1>
     <div>
         <button type="button" id="join" onclick="joinRoom()">Join</button>
-        <button type="button" id="inginBicara" onclick="inginBicara()">Ingin Bicara</button>
+        <button type="button" onclick="inginBicara()">Ingin Bicara</button>
+        <button type="button" onclick="selesaiBicara()">Selesai Bicara</button>
     </div>
     <div id="pesanSiaran"></div>
     <div id="videos-container"></div>
@@ -95,13 +108,18 @@
             }, 3000)
         })
 
-        socket.on('timer_video', (timer) => {
-            console.log('timer', timer)
-            document.getElementById('timer').innerHTML = timer
-        })
 
         socket.on('pesanSiaran', (userid, pesan) => {
             $('#pesanSiaran').append('<p><b>' + userid + '</b> : ' + pesan + '</p>')
+        })
+
+        socket.on('perserta_bicara', (userid) => {
+            $(`#${userid}`).removeClass('video-box').addClass('video-bicara')
+            console.log('perserta_bicara', userid)
+        })
+        socket.on('peserta_selesai_bicara', (userid) => {
+            $(`#${userid}`).addClass('video-box').removeClass('video-bicara')
+            console.log('peserta_selesai_bicara', userid)
         })
 
         // Membuat instance RTCMultiConnection
@@ -123,6 +141,8 @@
                 my_user_id = event.userid
                 socket.emit('mau_masuk', set_room, event.userid, my_socket_id)
                 console.log('mau_masuk', set_room, event.userid, my_socket_id)
+
+                $('#myid').text(my_user_id)
             }
 
             var videoBox = document.createElement('div');
@@ -139,11 +159,20 @@
         };
 
         // Event saat pengguna terputus atau keluar dari room
+        connection.onleave = function (event) {
+            console.log('Pengguna terputus atau keluar dari room: ' + event.userid);
+            var videoElement = document.getElementById(event.userid);
+            if (videoElement) {
+                videoElement.remove();
+            }
+        };
+
+        // Event saat pengguna terputus atau keluar dari room
         connection.onclose = function (event) {
             console.log('Pengguna terputus atau keluar dari room: ' + event.userid);
             var videoElement = document.getElementById(event.userid);
             if (videoElement) {
-                videoElement.parentNode.parentNode.removeChild(videoElement);
+                videoElement.remove();
             }
         };
 
@@ -163,9 +192,11 @@
                         })
                         .catch(function (error) {
                             // Penolakan izin akses perangkat, tangani kesalahan di sini
+                            alert('Izin akses perangkat ditolak:', error);
                             console.log('Izin akses perangkat ditolak:', error);
                         });
                 } else {
+                    alert('Room tidak tersedia')
                     console.log('Room tidak tersedia')
                 }
             })
@@ -174,6 +205,10 @@
         function inginBicara() {
             socket.emit('ingin_bertanya', set_room, my_user_id, my_socket_id)
             console.log('ingin_bertanya', set_room, my_user_id, my_socket_id)
+        }
+        function selesaiBicara() {
+            socket.emit('end_peserta_bicara', set_room, my_user_id)
+            console.log('end_peserta_bicara', set_room, my_user_id)
         }
 
     </script>

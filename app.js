@@ -35,6 +35,12 @@ io.on("connection", (socket) => {
     socket.on("bagikanPesan", (roomName, userid, pesan) => {
         io.to(roomName).emit("pesanSiaran", userid, pesan);
     });
+    socket.on("acc_peserta_bicara", (roomName, userid) => {
+        io.to(roomName).emit("perserta_bicara", userid);
+    });
+    socket.on("end_peserta_bicara", (roomName, userid) => {
+        io.to(roomName).emit("peserta_selesai_bicara", userid);
+    });
 
     // simpan roomid dan socket.id dari owner pengajar
     socket.on("owner_room", (owner_id) => {
