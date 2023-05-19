@@ -10,7 +10,9 @@ const io = socketio(server);
 
 let uuids = {};
 let owners = {};
-let roomJoin = {};
+
+// Menyimpan informasi ruangan dan peserta
+const rooms = {};
 
 io.on("connection", (socket) => {
     RTCMultiConnectionServer.addSocket(socket);
@@ -61,8 +63,6 @@ io.on("connection", (socket) => {
             my_userid,
             my_socket_id
         );
-
-        // roomJoin[owner_id]
     });
 
     // terima permintaan masuk dari owner room

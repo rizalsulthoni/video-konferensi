@@ -89,6 +89,7 @@
         var set_room = getParameterByName('room');
         let my_socket_id = '';
         let my_user_id = '';
+        let my_owner_id = '';
 
         // fungsi socket.io jika user sudah terkoneksi
         socket.on('connect', function () {
@@ -99,6 +100,7 @@
         socket.on('konfirmasi_data_masuk', (owner_userid) => {
             console.log('konfirmasi_data_masuk', owner_userid)
 
+            my_owner_id = owner_userid
             setTimeout(() => {
                 var ownerVideo = document.getElementById(owner_userid);
                 ownerVideo.classList.remove('video-box')
@@ -161,6 +163,12 @@
         // Event saat pengguna terputus atau keluar dari room
         connection.onleave = function (event) {
             console.log('Pengguna terputus atau keluar dari room: ' + event.userid);
+            if (my_owner_id == event.userid) {
+                alert('Pengajar telah keluar dari room')
+                setTimeout(() => {
+                    location.reload()
+                }, 1500)
+            }
             var videoElement = document.getElementById(event.userid);
             if (videoElement) {
                 videoElement.remove();
@@ -170,6 +178,14 @@
         // Event saat pengguna terputus atau keluar dari room
         connection.onclose = function (event) {
             console.log('Pengguna terputus atau keluar dari room: ' + event.userid);
+
+            if (my_owner_id == event.userid) {
+                alert('Pengajar telah keluar dari room')
+                setTimeout(() => {
+                    location.reload()
+                }, 1500)
+            }
+
             var videoElement = document.getElementById(event.userid);
             if (videoElement) {
                 videoElement.remove();

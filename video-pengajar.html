@@ -251,6 +251,7 @@
             $(`#pesertaBicara_${userid}`).remove()
             $(`#pesertaSelesaiBicara_${userid}`).text('Akhiri Bicara')
         }
+
         function pesertaSelesaiBicara(userid) {
             socket.emit('end_peserta_bicara', set_room, userid)
             console.log('end_peserta_bicara', set_room, userid)
