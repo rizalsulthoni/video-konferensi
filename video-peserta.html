@@ -3,6 +3,7 @@
 
 <head>
     <title>Video Konferensi dengan RTCMultiConnection</title>
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
     <style>
         #videos-container {
             display: flex;
@@ -49,10 +50,15 @@
 </head>
 
 <body>
-    <h1>Video Konferensi <sup id="timer"></sup> : <button type="button" id="join" onclick="joinRoom()">Join</button>
-    </h1>
+    <h1>Video Konferensi <sup id="timer"></sup></h1>
+    <div>
+        <button type="button" id="join" onclick="joinRoom()">Join</button>
+        <button type="button" id="inginBicara" onclick="inginBicara()">Ingin Bicara</button>
+    </div>
+    <div id="pesanSiaran"></div>
     <div id="videos-container"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/rtcmulticonnection@3.7.1/dist/RTCMultiConnection.min.js"></script>
     <script>
@@ -67,8 +73,9 @@
         }
 
         var socket = io();
-        var set_room = 'kode-room-id';
+        var set_room = getParameterByName('room');
         let my_socket_id = '';
+        let my_user_id = '';
 
         // fungsi socket.io jika user sudah terkoneksi
         socket.on('connect', function () {
@@ -93,6 +100,10 @@
             document.getElementById('timer').innerHTML = timer
         })
 
+        socket.on('pesanSiaran', (userid, pesan) => {
+            $('#pesanSiaran').append('<p><b>' + userid + '</b> : ' + pesan + '</p>')
+        })
+
         // Membuat instance RTCMultiConnection
         var connection = new RTCMultiConnection();
 
@@ -109,6 +120,7 @@
             console.log(event)
 
             if (event.type === 'local') {
+                my_user_id = event.userid
                 socket.emit('mau_masuk', set_room, event.userid, my_socket_id)
                 console.log('mau_masuk', set_room, event.userid, my_socket_id)
             }
@@ -147,6 +159,7 @@
                         .then(function (stream) {
                             // Akses perangkat berhasil, lanjutkan dengan menggunakan stream
                             connection.join(set_room)
+                            socket.emit('joinRoom', set_room)
                         })
                         .catch(function (error) {
                             // Penolakan izin akses perangkat, tangani kesalahan di sini
@@ -156,6 +169,11 @@
                     console.log('Room tidak tersedia')
                 }
             })
+        }
+
+        function inginBicara() {
+            socket.emit('ingin_bertanya', set_room, my_user_id, my_socket_id)
+            console.log('ingin_bertanya', set_room, my_user_id, my_socket_id)
         }
 
     </script>

@@ -5,18 +5,23 @@
     <title>Video Konferensi dengan RTCMultiConnection</title>
     <link rel="icon" type="image/x-icon" href="data:image/x-icon;,">
     <style>
-        #videos-conrtainer {
-            width: 500px;
+        #videos-container {
+            width: 100%;
             height: auto;
             display: flex;
             flex-direction: column;
             gap: 20px;
+            margin-top: 1rem;
         }
 
         #videos-pengajar {
             width: 100%;
             height: auto;
             position: relative;
+            display: flex;
+            gap: 15px;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
         }
 
         #videos-peserta {
@@ -63,18 +68,44 @@
 </head>
 
 <body>
-    <h1>Video Konferensi <sup id="timer"></sup> <button type="button" id="open" onclick="openRoom()">Open</button></h1>
+    <h1>Video Konferensi <sup id="timer"></sup></h1>
+    <div>
+        <button type="button" id="open" onclick="openRoom()">Open</button>
+        <button type="button" id="bagikanPesan" onclick="bagikanPesan()">Bagikan Pesan</button>
+    </div>
+
     <div id="videos-container">
-        <div id="videos-pengajar"></div>
+        <div id="videos-pengajar">
+            <div style="display: flex; gap: 15px; flex-direction: column;">
+                <ul id="list-peserta">
+                    <li><small><strong>List Peserta</strong></small></li>
+                </ul>
+                <ul id="list-bertanya">
+                    <li><small><strong>Peserta Bertanya</strong></small></li>
+                </ul>
+            </div>
+        </div>
         <div id="videos-peserta"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/rtcmulticonnection@3.7.1/dist/RTCMultiConnection.min.js"></script>
 
     <script>
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+    </script>
+    <script>
         var socket = io();
-        var set_room = 'kode-room-id';
+        var set_room = getParameterByName('room');
         var set_owner_userid = '';
 
         // Membuat instance RTCMultiConnection
@@ -110,7 +141,21 @@
                 videosPeserta.appendChild(videoBox);
             }
 
-            startTimer()
+            // startTimer()
+
+            connection.getAllParticipants().forEach(function (participantId) {
+                var user = connection.peers[participantId];
+                var hisUID = user.userid;
+
+                var mainListUser = document.getElementById('list-peserta')
+                var listUser = document.createElement('li');
+                var isUser = document.createTextNode(hisUID)
+                listUser.appendChild(isUser)
+                mainListUser.appendChild(listUser)
+
+                // alert(hisUID + ' connected with you.');
+                console.log(hisUID + ' connected with you.')
+            });
         };
 
         // Event saat koneksi terhubung
@@ -155,6 +200,20 @@
             socket.emit('terima_permintaan_masuk', set_owner_userid, data_userid, socket_id)
         })
 
+        socket.on('peserta_ingin_bertanya', (my_user_id, my_socket_id) => {
+            console.log('peserta_ingin_bertanya', my_user_id, my_socket_id)
+
+            const listInginBertanya = $('#list-bertanya')
+            const listUserTanya = `
+                <li data-tanya-id="${my_user_id}">
+                    <b>${my_user_id}</b> ingin bertanya : <button type="button" data-konfirmasi-bicara="${my_user_id}">Terima</button> <button type="button" data-tolak-bicara="${my_user_id}">Tolak</button>
+                </li>
+            `;
+            if (listInginBertanya.find(`[data-tanya-id="${my_user_id}"]`).length === 0) {
+                listInginBertanya.append(listUserTanya)
+            }
+        })
+
         // buka room webinar
         function openRoom() {
             connection.checkPresence(set_room, (isRoomExists, roomid) => {
@@ -162,38 +221,15 @@
                     console.log('Room sudah ada')
                 } else {
                     connection.open(set_room)
+                    socket.emit('createRoom', set_room)
                 }
             })
         }
 
-    </script>
-
-    <script>
-        function startTimer() {
-            var totalSeconds = 0;
-            setInterval(() => {
-                ++totalSeconds;
-                var hour = Math.floor(totalSeconds / 3600);
-                var minute = Math.floor((totalSeconds - hour * 3600) / 60);
-                var seconds = totalSeconds - (hour * 3600 + minute * 60);
-                var runTimer = hour + ":" + minute + ":" + seconds;
-                document.getElementById("timer").innerHTML = runTimer;
-
-                // broadcast ke semua user dalam room ini 
-                socket.emit('run_timer', set_owner_userid, runTimer)
-                console.log('run_timer', runTimer)
-            }, 1000);
+        function bagikanPesan() {
+            socket.emit('bagikanPesan', set_room, set_owner_userid, 'pesan siaran untuk semua anggota room')
         }
 
-        function getParameterByName(name, url) {
-            if (!url) url = window.location.href;
-            name = name.replace(/[[\]]/g, "\\$&");
-            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
-                results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, " "));
-        }
     </script>
 </body>
 

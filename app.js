@@ -10,10 +10,31 @@ const io = socketio(server);
 
 let uuids = {};
 let owners = {};
+let roomJoin = {};
 
 io.on("connection", (socket) => {
     RTCMultiConnectionServer.addSocket(socket);
     console.log("client terhubung: ", socket.id);
+
+    // Event listener untuk membuat ruangan baru
+    socket.on("createRoom", (roomName) => {
+        // Membuat ruangan baru dengan nama yang diberikan
+        socket.join(roomName);
+        console.log(`Room "${roomName}" telah dibuat.`);
+    });
+
+    // Event listener untuk bergabung dengan ruangan
+    socket.on("joinRoom", (roomName) => {
+        // Bergabung dengan ruangan yang sudah ada dengan nama yang diberikan
+        socket.join(roomName);
+        console.log(
+            `Socket dengan ID ${socket.id} bergabung dengan room "${roomName}".`
+        );
+    });
+
+    socket.on("bagikanPesan", (roomName, userid, pesan) => {
+        io.to(roomName).emit("pesanSiaran", userid, pesan);
+    });
 
     // simpan roomid dan socket.id dari owner pengajar
     socket.on("owner_room", (owner_id) => {
@@ -34,6 +55,8 @@ io.on("connection", (socket) => {
             my_userid,
             my_socket_id
         );
+
+        // roomJoin[owner_id]
     });
 
     // terima permintaan masuk dari owner room
@@ -59,6 +82,14 @@ io.on("connection", (socket) => {
         console.log("run_timer", owner_id, timer);
         socket.broadcast.to(owners[owner_id]).emit("timer_video", timer);
     });
+
+    socket.on("ingin_bertanya", (owner_id, my_user_id, my_socket_id) => {
+        io.to(owners[owner_id]).emit(
+            "peserta_ingin_bertanya",
+            my_user_id,
+            my_socket_id
+        );
+    });
 });
 
 app.use(express.static("public"));
@@ -76,6 +107,7 @@ app.get("/video-konferensi", (req, res) => {
     res.sendFile(__dirname + "/video-konferensi.html");
 });
 
-server.listen(5000, () => {
-    console.log("server up and running on port 3000");
+const PORT = 5000;
+server.listen(PORT, () => {
+    console.log("server up and running on port " + PORT);
 });
